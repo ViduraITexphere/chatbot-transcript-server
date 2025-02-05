@@ -17,7 +17,7 @@ app.use(cors());
 const port = process.env.PORT || 5000;
 const db_url = process.env.DB_URL;
 app.use(express.json());
-const MODEL_NAME = "gemini-1.0-pro";
+const MODEL_NAME = "gemini-1.5-flash";
 const API_KEY = process.env.API_KEY;
 
 mongoose.connect(db_url);
