@@ -4,25 +4,23 @@ const mongoose = require("mongoose");
 const { ObjectId } = mongoose.Types;
 const ChatModel = require("./models/data");
 const transcriptRouter = require("./routes/transcriptRoutes");
-
 const {
   GoogleGenerativeAI,
   HarmCategory,
   HarmBlockThreshold,
 } = require("@google/generative-ai");
 const dotenv = require("dotenv").config();
-
 const app = express();
 app.use(cors());
 const port = process.env.PORT || 5000;
 const db_url = process.env.DB_URL;
 app.use(express.json());
 
-const MODEL_NAME = "gemini-1.5-flash";
+// Update the model name here
+const MODEL_NAME = "gemini-1.5-flash"; // Changed from "gemini-1.0-pro"
 const API_KEY = process.env.API_KEY;
 
 mongoose.connect(db_url);
-
 mongoose.connection.on("connected", () => {
   console.log("Connected to MongoDB");
 });
@@ -34,10 +32,10 @@ async function runChat(userInput, chatHistory) {
   const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
   const generationConfig = {
-    temperature: 0.7,
+    temperature: 0.9,
     topK: 1,
     topP: 1,
-    maxOutputTokens: 2048,
+    maxOutputTokens: 2048, // Adjust if needed for gemini-1.5-flash
   };
 
   const safetySettings = [
@@ -59,24 +57,29 @@ async function runChat(userInput, chatHistory) {
     },
   ];
 
-  // Format chat history properly for Gemini 1.5
-  const history = chatHistory.messages.map((msg) => ({
-    role: msg.role,
-    parts: [{ text: msg.text }],
-  }));
-
-  // **Start a chat session correctly**
-  const chatSession = model.startChat({
+  const chat = model.startChat({
     generationConfig,
     safetySettings,
-    history, // Corrected format
+    history: [
+      {
+        role: "user",
+        parts: [{ text: chatHistory.model }],
+      },
+      {
+        role: "model",
+        parts: [
+          {
+            text: "",
+          },
+        ],
+      },
+    ],
   });
 
-  // **Send user input message to model**
-  const result = await chatSession.sendMessage(userInput);
-  const responseText = result.response.text(); // Fixed response extraction
+  const result = await chat.sendMessage(userInput);
+  const responseText = result.response.text();
 
-  // Convert URLs to clickable links
+  // Check if the response contains a URL
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const responseWithLinks = responseText.replace(urlRegex, (url) => {
     return `<a href="${url}" target="_blank">${url}</a>`;
@@ -85,12 +88,15 @@ async function runChat(userInput, chatHistory) {
   return responseWithLinks;
 }
 
-// Chat history endpoint
+// Route to handle chat history
 app.post("/chat-history/:id", async (req, res) => {
   try {
     const chatHistoryId = req.params.id;
     const userInput = req.body?.userInput;
+    console.log("userInput:😀", userInput);
+    console.log(chatHistoryId);
 
+    // Check if chatHistoryId is a valid ObjectId
     if (!ObjectId.isValid(chatHistoryId)) {
       return res.status(400).json({ error: "Invalid chat history ID" });
     }
@@ -104,12 +110,14 @@ app.post("/chat-history/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid request body" });
     }
 
-    // Fetch AI response
+    // Pass chatHistory to runChat function
     const response = await runChat(userInput, chatData);
-    res.json({ response });
+    console.log("response:😀", response);
 
+    // Send response as JSON
+    res.json({ response });
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error fetching chat history:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
