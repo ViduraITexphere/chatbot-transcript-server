@@ -17,8 +17,7 @@ app.use(cors());
 const port = process.env.PORT || 5000;
 const db_url = process.env.DB_URL;
 app.use(express.json());
-// const MODEL_NAME = "gemini-1.0-pro";
-const MODEL_NAME = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const MODEL_NAME = "gemini-1.5-flash";
 const API_KEY = process.env.API_KEY;
 
 mongoose.connect(db_url);
@@ -34,7 +33,7 @@ async function runChat(userInput, chatHistory) {
   const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
   const generationConfig = {
-    temperature: 0.9,
+    temperature: 0.7, // Adjusted for better balance between creativity and coherence
     topK: 1,
     topP: 1,
     maxOutputTokens: 2048,
@@ -59,29 +58,23 @@ async function runChat(userInput, chatHistory) {
     },
   ];
 
+  // Prepare chat history for the model
+  const history = chatHistory.messages.map((msg) => ({
+    role: msg.role,
+    parts: [{ text: msg.text }],
+  }));
+
+  // Start chat session
   const chat = model.startChat({
     generationConfig,
     safetySettings,
-    history: [
-      {
-        role: "user",
-        parts: [{ text: chatHistory.model }],
-      },
-      {
-        role: "model",
-        parts: [
-          {
-            text: "",
-          },
-        ],
-      },
-    ],
+    history,
   });
 
   const result = await chat.sendMessage(userInput);
   const responseText = result.response.text();
 
-  // Check if the response contains a URL
+  // Check if the response contains a URL and format it
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const responseWithLinks = responseText.replace(urlRegex, (url) => {
     return `<a href="${url}" target="_blank">${url}</a>`;
@@ -90,16 +83,15 @@ async function runChat(userInput, chatHistory) {
   return responseWithLinks;
 }
 
-// check if the response contains a URL
-const urlRegex = /(https?:\/\/[^\s]+)/g;
-const responseContainsURL = app.post("/chat-history/:id", async (req, res) => {
+// Handle chatbot requests
+app.post("/chat-history/:id", async (req, res) => {
   try {
     const chatHistoryId = req.params.id;
     const userInput = req.body?.userInput;
-    console.log("userInput:😀", userInput);
-    console.log(chatHistoryId);
 
-    // Check if chatHistoryId is a valid ObjectId
+    console.log("User Input:😀", userInput);
+    console.log("Chat History ID:", chatHistoryId);
+
     if (!ObjectId.isValid(chatHistoryId)) {
       return res.status(400).json({ error: "Invalid chat history ID" });
     }
@@ -115,9 +107,8 @@ const responseContainsURL = app.post("/chat-history/:id", async (req, res) => {
 
     // Pass chatHistory to runChat function
     const response = await runChat(userInput, chatData);
-    console.log("response:😀", response);
+    console.log("Response:😀", response);
 
-    // Send response as JSON
     res.json({ response });
   } catch (error) {
     console.error("Error fetching chat history:", error);
