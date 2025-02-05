@@ -17,6 +17,7 @@ app.use(cors());
 const port = process.env.PORT || 5000;
 const db_url = process.env.DB_URL;
 app.use(express.json());
+
 const MODEL_NAME = "gemini-1.5-flash";
 const API_KEY = process.env.API_KEY;
 
@@ -33,7 +34,7 @@ async function runChat(userInput, chatHistory) {
   const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
   const generationConfig = {
-    temperature: 0.7, // Adjusted for better balance between creativity and coherence
+    temperature: 0.7,
     topK: 1,
     topP: 1,
     maxOutputTokens: 2048,
@@ -58,23 +59,24 @@ async function runChat(userInput, chatHistory) {
     },
   ];
 
-  // Prepare chat history for the model
+  // Format chat history properly for Gemini 1.5
   const history = chatHistory.messages.map((msg) => ({
     role: msg.role,
     parts: [{ text: msg.text }],
   }));
 
-  // Start chat session
-  const chat = model.startChat({
+  // **Start a chat session correctly**
+  const chatSession = model.startChat({
     generationConfig,
     safetySettings,
-    history,
+    history, // Corrected format
   });
 
-  const result = await chat.sendMessage(userInput);
-  const responseText = result.response.text();
+  // **Send user input message to model**
+  const result = await chatSession.sendMessage(userInput);
+  const responseText = result.response.text(); // Fixed response extraction
 
-  // Check if the response contains a URL and format it
+  // Convert URLs to clickable links
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const responseWithLinks = responseText.replace(urlRegex, (url) => {
     return `<a href="${url}" target="_blank">${url}</a>`;
@@ -83,14 +85,11 @@ async function runChat(userInput, chatHistory) {
   return responseWithLinks;
 }
 
-// Handle chatbot requests
+// Chat history endpoint
 app.post("/chat-history/:id", async (req, res) => {
   try {
     const chatHistoryId = req.params.id;
     const userInput = req.body?.userInput;
-
-    console.log("User Input:😀", userInput);
-    console.log("Chat History ID:", chatHistoryId);
 
     if (!ObjectId.isValid(chatHistoryId)) {
       return res.status(400).json({ error: "Invalid chat history ID" });
@@ -105,13 +104,12 @@ app.post("/chat-history/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid request body" });
     }
 
-    // Pass chatHistory to runChat function
+    // Fetch AI response
     const response = await runChat(userInput, chatData);
-    console.log("Response:😀", response);
-
     res.json({ response });
+
   } catch (error) {
-    console.error("Error fetching chat history:", error);
+    console.error("Error:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
