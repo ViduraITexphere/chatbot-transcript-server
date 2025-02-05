@@ -17,7 +17,6 @@ app.use(cors());
 const port = process.env.PORT || 5000;
 const db_url = process.env.DB_URL;
 app.use(express.json());
-const MODEL_NAME = "gemini-1.5-pro";
 const API_KEY = process.env.API_KEY;
 
 mongoose.connect(db_url);
@@ -30,7 +29,9 @@ app.use("/", transcriptRouter);
 
 async function runChat(userInput, chatHistory) {
   const genAI = new GoogleGenerativeAI(API_KEY);
-  const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+  const model = genAI.getGenerativeModel({
+    model: "gemini-1.5-flash",
+  });
 
   const generationConfig = {
     temperature: 0.9,
